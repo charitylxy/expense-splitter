@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+	--theme-navy: #0b3d6e;
+	--theme-blue: #6794c1;
+	--theme-orange: #ff6a00;
+	--theme-peach: #f1ad63;
+	--theme-slate: #3a4f64;
+	--theme-cream: #e6d1b7;
+	--theme-bg: #d8dade;
+}
+
+body {
+	background: #ffffff;
+	color: #1f2937;
+}
+
+/* Palette remap for existing utility-heavy components */
+.bg-indigo-600 {
+	background-color: var(--theme-navy) !important;
+}
+
+.hover\:bg-indigo-700:hover {
+	background-color: var(--theme-slate) !important;
+}
+
+.text-indigo-600 {
+	color: var(--theme-navy) !important;
+}
+
+.hover\:text-indigo-800:hover {
+	color: var(--theme-slate) !important;
+}
+
+.bg-indigo-50 {
+	background-color: color-mix(in srgb, var(--theme-blue) 20%, white) !important;
+}
+
+.text-indigo-700 {
+	color: var(--theme-slate) !important;
+}
+
+.hover\:border-indigo-300:hover {
+	border-color: var(--theme-blue) !important;
+}
+
+.focus\:ring-indigo-400:focus {
+	--tw-ring-color: color-mix(in srgb, var(--theme-blue) 65%, white) !important;
+}
