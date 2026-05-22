@@ -12,6 +12,7 @@ type GroupData = {
   name: string
   description: string | null
   default_currency: string
+  created_by?: string | null
 }
 
 type EditableMember = {
@@ -50,6 +51,7 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
   const [shareError, setShareError] = useState('')
   const [shareEmail, setShareEmail] = useState('')
   const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([])
+  const isOwner = !!group?.created_by && group.created_by === session?.user?.id
 
   async function loadSharedUsers(groupId: string, currentUserId?: string) {
     const { data: sharedData } = await supabase
@@ -124,6 +126,11 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
   }, [id, session?.user?.id])
 
   async function handleShareUser() {
+    if (!isOwner) {
+      setShareError('Only the group owner can share access.')
+      return
+    }
+
     setShareError('')
     const email = shareEmail.trim().toLowerCase()
 
@@ -141,10 +148,14 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
       .select('id, email')
-      .eq('email', email)
+      .ilike('email', email)
       .maybeSingle()
 
     if (profileErr) {
+      if (profileErr.message.toLowerCase().includes('profiles')) {
+        setShareError('Email sharing is not fully set up yet. Re-run supabase/auth_migration.sql to create/backfill profiles.')
+        return
+      }
       setShareError(profileErr.message)
       return
     }
@@ -189,6 +200,11 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
   }
 
   async function handleRemoveSharedUser(sharedId: string) {
+    if (!isOwner) {
+      setShareError('Only the group owner can manage shared access.')
+      return
+    }
+
     setShareError('')
     setSharing(true)
 
@@ -480,59 +496,61 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
         </div>
       </form>
 
-      <div className="space-y-4 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-800">Share Group</h2>
-        <p className="text-sm text-gray-500">
-          Share this group by email. If that email already has an account, they get access instantly.
-        </p>
+      {isOwner && (
+        <div className="space-y-4 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-800">Share Group</h2>
+          <p className="text-sm text-gray-500">
+            Share this group by email. If that email already has an account, they get access instantly.
+          </p>
 
-        {shareError && <p className="text-red-600 text-sm bg-red-50 rounded p-3">{shareError}</p>}
+          {shareError && <p className="text-red-600 text-sm bg-red-50 rounded p-3">{shareError}</p>}
 
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="email"
-            value={shareEmail}
-            onChange={(e) => setShareEmail(e.target.value)}
-            placeholder="friend@example.com"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
-          <button
-            type="button"
-            onClick={handleShareUser}
-            disabled={sharing}
-            className="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50"
-          >
-            {sharing ? 'Sharing...' : 'Share Access'}
-          </button>
-        </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="email"
+              value={shareEmail}
+              onChange={(e) => setShareEmail(e.target.value)}
+              placeholder="friend@example.com"
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            />
+            <button
+              type="button"
+              onClick={handleShareUser}
+              disabled={sharing}
+              className="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50"
+            >
+              {sharing ? 'Sharing...' : 'Share Access'}
+            </button>
+          </div>
 
-        <div>
-          <p className="text-sm font-medium text-gray-700 mb-2">Shared Users</p>
-          {sharedUsers.length === 0 ? (
-            <p className="text-sm text-gray-500">No shared users yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {sharedUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800 break-all">{user.email ?? user.user_id}</p>
-                    <p className="text-xs text-gray-500 break-all">{user.user_id}</p>
-                    <p className="text-xs text-gray-500 capitalize">Role: {user.role}</p>
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">Shared Users</p>
+            {sharedUsers.length === 0 ? (
+              <p className="text-sm text-gray-500">No shared users yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {sharedUsers.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800 break-all">{user.email ?? user.user_id}</p>
+                      <p className="text-xs text-gray-500 break-all">{user.user_id}</p>
+                      <p className="text-xs text-gray-500 capitalize">Role: {user.role}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSharedUser(user.id)}
+                      disabled={sharing}
+                      className="text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveSharedUser(user.id)}
-                    disabled={sharing}
-                    className="text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

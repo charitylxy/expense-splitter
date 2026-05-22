@@ -1,14 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { useState } from 'react'
 
 export function Header() {
   const { session, loading, signOut } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const isAuthPage = pathname?.startsWith('/auth/')
+  const showSignedInMenu = !!session && !isAuthPage
 
   const handleLogout = async () => {
     try {
@@ -37,7 +40,7 @@ export function Header() {
 
           {!loading && (
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              {session ? (
+              {showSignedInMenu ? (
                 <div className="relative">
                   <button
                     onClick={() => setMenuOpen(!menuOpen)}

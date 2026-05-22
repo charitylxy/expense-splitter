@@ -21,6 +21,38 @@ create table if not exists group_members (
 
 alter table group_members enable row level security;
 
+-- Helper functions to avoid recursive RLS checks between groups and group_members
+create or replace function public.is_group_owner(target_group_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.groups g
+    where g.id = target_group_id
+      and g.created_by = auth.uid()
+  );
+$$;
+
+create or replace function public.is_group_member(target_group_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.group_members gm
+    where gm.group_id = target_group_id
+      and gm.user_id = auth.uid()
+  );
+$$;
+
+grant execute on function public.is_group_owner(uuid) to anon, authenticated;
+grant execute on function public.is_group_member(uuid) to anon, authenticated;
+
 -- 2b. Public profile table for looking up users by email when sharing groups
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -77,54 +109,23 @@ drop policy if exists "Owners can remove shared users" on group_members;
 create policy "Users can read their memberships"
   on group_members
   for select
-  using (
-    user_id = auth.uid()
-    or exists (
-      select 1 from groups
-      where groups.id = group_members.group_id
-      and groups.created_by = auth.uid()
-    )
-  );
+  using (user_id = auth.uid() or public.is_group_owner(group_id));
 
 create policy "Owners can add shared users"
   on group_members
   for insert
-  with check (
-    exists (
-      select 1 from groups
-      where groups.id = group_members.group_id
-      and groups.created_by = auth.uid()
-    )
-  );
+  with check (public.is_group_owner(group_id));
 
 create policy "Owners can update shared users"
   on group_members
   for update
-  using (
-    exists (
-      select 1 from groups
-      where groups.id = group_members.group_id
-      and groups.created_by = auth.uid()
-    )
-  )
-  with check (
-    exists (
-      select 1 from groups
-      where groups.id = group_members.group_id
-      and groups.created_by = auth.uid()
-    )
-  );
+  using (public.is_group_owner(group_id))
+  with check (public.is_group_owner(group_id));
 
 create policy "Owners can remove shared users"
   on group_members
   for delete
-  using (
-    exists (
-      select 1 from groups
-      where groups.id = group_members.group_id
-      and groups.created_by = auth.uid()
-    )
-  );
+  using (public.is_group_owner(group_id));
 
 -- 3. Update RLS policies for groups (owner or group member)
 drop policy if exists "Users can view their own groups and shared groups" on groups;
@@ -135,14 +136,7 @@ drop policy if exists "Users can delete their own groups" on groups;
 create policy "Users can view their own groups and shared groups"
   on groups
   for select
-  using (
-    auth.uid() = created_by
-    or exists (
-      select 1 from group_members
-      where group_members.group_id = groups.id
-      and group_members.user_id = auth.uid()
-    )
-  );
+  using (auth.uid() = created_by or public.is_group_member(id));
 
 create policy "Users can create groups"
   on groups
@@ -167,20 +161,7 @@ drop policy if exists "Users can manage members in accessible groups" on members
 create policy "Users can manage members in accessible groups"
   on members
   for all
-  using (
-    exists (
-      select 1 from groups
-      where groups.id = members.group_id
-      and (
-        auth.uid() = groups.created_by
-        or exists (
-          select 1 from group_members
-          where group_members.group_id = groups.id
-          and group_members.user_id = auth.uid()
-        )
-      )
-    )
-  );
+  using (public.is_group_owner(group_id) or public.is_group_member(group_id));
 
 -- 5. Update RLS policies for expenses
 drop policy if exists "Public read/write expenses" on expenses;
@@ -189,20 +170,7 @@ drop policy if exists "Users can manage expenses in accessible groups" on expens
 create policy "Users can manage expenses in accessible groups"
   on expenses
   for all
-  using (
-    exists (
-      select 1 from groups
-      where groups.id = expenses.group_id
-      and (
-        auth.uid() = groups.created_by
-        or exists (
-          select 1 from group_members
-          where group_members.group_id = groups.id
-          and group_members.user_id = auth.uid()
-        )
-      )
-    )
-  );
+  using (public.is_group_owner(group_id) or public.is_group_member(group_id));
 
 -- 6. Update RLS policies for splits
 drop policy if exists "Public read/write splits" on expense_splits;
@@ -214,15 +182,10 @@ create policy "Users can manage splits in accessible groups"
   using (
     exists (
       select 1 from expenses
-      join groups on groups.id = expenses.group_id
       where expenses.id = expense_splits.expense_id
       and (
-        auth.uid() = groups.created_by
-        or exists (
-          select 1 from group_members
-          where group_members.group_id = groups.id
-          and group_members.user_id = auth.uid()
-        )
+        public.is_group_owner(expenses.group_id)
+        or public.is_group_member(expenses.group_id)
       )
     )
   );
@@ -234,20 +197,7 @@ drop policy if exists "Users can manage settlements in accessible groups" on set
 create policy "Users can manage settlements in accessible groups"
   on settlements
   for all
-  using (
-    exists (
-      select 1 from groups
-      where groups.id = settlements.group_id
-      and (
-        auth.uid() = groups.created_by
-        or exists (
-          select 1 from group_members
-          where group_members.group_id = groups.id
-          and group_members.user_id = auth.uid()
-        )
-      )
-    )
-  );
+  using (public.is_group_owner(group_id) or public.is_group_member(group_id));
 
 -- 8. Keep public read on categories (for dropdowns)
 drop policy if exists "Public read categories" on categories;
