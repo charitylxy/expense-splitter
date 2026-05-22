@@ -548,7 +548,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
       {/* Expenses List */}
       <div>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col items-start gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
             Expenses ({visibleExpenses.length}/{allExpenses.length})
           </h2>
@@ -636,16 +636,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         ) : (
           <>
             {visibleExpenses.length > EXPENSE_PAGE_SIZE && (
-              <div className="flex items-center justify-between mb-3">
-                <button
-                  type="button"
-                  onClick={() => setExpensePage((p) => Math.max(0, p - 1))}
-                  disabled={expensePage === 0}
-                  className="text-xs px-3 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
-                >
-                  ← Previous
-                </button>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
+              <div className="mb-3 rounded-xl border border-[#efe6df] bg-[#fcfaf8] px-3 py-2 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+                <div className="flex items-center justify-center gap-2 text-xs text-gray-500 sm:hidden">
                   <span>Page</span>
                   <input
                     type="number"
@@ -656,16 +648,40 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                     className="w-10 rounded-md border border-[#e5d9cd] bg-white px-1 py-0.5 text-center text-[11px] text-gray-700"
                     aria-label="Go to expense page"
                   />
-                  <span>of {expenseTotalPages} · {visibleExpenses.length} expenses</span>
+                  <span>of {expenseTotalPages}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setExpensePage((p) => Math.min(expenseTotalPages - 1, p + 1))}
-                  disabled={expensePage >= expenseTotalPages - 1}
-                  className="text-xs px-3 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
-                >
-                  Next →
-                </button>
+                <div className="mt-2 flex items-center justify-between gap-2 sm:mt-0 sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center">
+                  <button
+                    type="button"
+                    onClick={() => setExpensePage((p) => Math.max(0, p - 1))}
+                    disabled={expensePage === 0}
+                    className="text-xs px-3 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
+                  >
+                    ← Previous
+                  </button>
+                  <div className="hidden items-center justify-center gap-2 text-xs text-gray-500 sm:flex">
+                    <span>Page</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={expenseTotalPages}
+                      value={expensePage + 1}
+                      onChange={(e) => goToExpensePage(Number(e.target.value))}
+                      className="w-10 rounded-md border border-[#e5d9cd] bg-white px-1 py-0.5 text-center text-[11px] text-gray-700"
+                      aria-label="Go to expense page"
+                    />
+                    <span>of {expenseTotalPages} · {visibleExpenses.length} expenses</span>
+                  </div>
+                  <span className="text-[11px] text-gray-500 sm:hidden">{visibleExpenses.length} expenses</span>
+                  <button
+                    type="button"
+                    onClick={() => setExpensePage((p) => Math.min(expenseTotalPages - 1, p + 1))}
+                    disabled={expensePage >= expenseTotalPages - 1}
+                    className="text-xs px-3 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
+                  >
+                    Next →
+                  </button>
+                </div>
               </div>
             )}
 
@@ -744,7 +760,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
             <div className="md:hidden">
               {pagedExpenses.map((expense) => (
-                <div key={expense.id} className="px-3 py-2 border-b border-[#f0e8e1] last:border-b-0">
+                <div key={expense.id} className="px-4 py-3 border-b border-[#f0e8e1] last:border-b-0">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-gray-800 break-words leading-tight">{expense.title}</p>
@@ -817,9 +833,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                     setPersonModalSortBy('date')
                     setPersonModalSortOrder('desc')
                   }}
-                  className="w-full text-left bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm hover:border-[#6794c1] hover:shadow-md transition cursor-pointer"
+                  className="w-full text-left bg-white border border-gray-100 rounded-xl px-4 py-4 sm:px-5 shadow-sm hover:border-[#6794c1] hover:shadow-md transition cursor-pointer"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <p className="font-semibold text-gray-800">{summary.name}</p>
                     <p className="text-sm font-bold text-gray-800">
                       {convertExpenses
