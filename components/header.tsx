@@ -30,20 +30,20 @@ export function Header() {
           <span className="w-1/6 bg-[#3a4f64]" />
           <span className="w-1/6 bg-[#e6d1b7]" />
         </div>
-        <div className="py-4 px-6 text-[#0b3d6e] flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold tracking-tight">
+        <div className="py-3 px-4 sm:py-4 sm:px-6 text-[#0b3d6e] flex items-center justify-between gap-3">
+          <Link href="/" className="text-2xl sm:text-xl font-bold tracking-tight leading-tight">
             Expense Splitter
           </Link>
 
           {!loading && (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               {session ? (
                 <div className="relative">
                   <button
                     onClick={() => setMenuOpen(!menuOpen)}
-                    className="flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-slate-100 transition text-sm"
+                    className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-lg hover:bg-slate-100 transition text-sm"
                   >
-                    <span className="text-slate-600">{session.user?.email}</span>
+                    <span className="text-slate-600 max-w-[145px] truncate">{session.user?.email}</span>
                     <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
@@ -66,13 +66,13 @@ export function Header() {
                 <div className="flex gap-2">
                   <Link
                     href="/auth/login"
-                    className="px-4 py-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    className="px-2 sm:px-4 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 whitespace-nowrap"
                   >
                     Sign In
                   </Link>
                   <Link
                     href="/auth/signup"
-                    className="px-4 py-1 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    className="px-3 sm:px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
                   >
                     Sign Up
                   </Link>

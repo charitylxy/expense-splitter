@@ -39,9 +39,9 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white px-4">
+    <div className="min-h-[72vh] flex items-start sm:items-center justify-center bg-gradient-to-b from-slate-50 to-white px-4 pt-6 sm:pt-0">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
           <h1 className="text-3xl font-bold text-navy-900 mb-2">Expense Splitter</h1>
           <p className="text-slate-600 mb-8">Create a new account</p>
 
