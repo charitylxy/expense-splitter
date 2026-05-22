@@ -33,6 +33,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [expensePaidByFilter, setExpensePaidByFilter] = useState('all')
   const [expenseSortBy, setExpenseSortBy] = useState<'date' | 'category' | 'paid_by'>('date')
   const [expenseSortOrder, setExpenseSortOrder] = useState<'desc' | 'asc'>('desc')
+  const [expenseFiltersOpen, setExpenseFiltersOpen] = useState(false)
+  const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -111,6 +113,13 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   function handleConversionChange(enabled: boolean) {
     setConvertExpenses(enabled)
     localStorage.setItem(`group:${id}:convert`, String(enabled))
+  }
+
+  function toggleExpenseSplits(expenseId: string) {
+    setExpandedSplits((prev) => ({
+      ...prev,
+      [expenseId]: !prev[expenseId],
+    }))
   }
 
   if (loading) {
@@ -509,64 +518,75 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
       {/* Expenses List */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Expenses ({visibleExpenses.length}/{allExpenses.length})
-        </h2>
-
-        <div className="bg-[#f3efeb] border border-[#e5d9cd] rounded-xl px-4 py-3 shadow-sm mb-3 grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-            <select
-              value={expenseCategoryFilter}
-              onChange={(e) => setExpenseCategoryFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="all">All categories</option>
-              {availableExpenseCategories.map((category) => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Paid By</label>
-            <select
-              value={expensePaidByFilter}
-              onChange={(e) => setExpensePaidByFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="all">Everyone</option>
-              {allMembers.map((member) => (
-                <option key={member.id} value={member.id}>{member.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Sort By</label>
-            <select
-              value={expenseSortBy}
-              onChange={(e) => setExpenseSortBy(e.target.value as 'date' | 'category' | 'paid_by')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="date">Date</option>
-              <option value="category">Category</option>
-              <option value="paid_by">Paid By</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Order</label>
-            <select
-              value={expenseSortOrder}
-              onChange={(e) => setExpenseSortOrder(e.target.value as 'desc' | 'asc')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </div>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            Expenses ({visibleExpenses.length}/{allExpenses.length})
+          </h2>
+          <button
+            type="button"
+            onClick={() => setExpenseFiltersOpen((prev) => !prev)}
+            className="text-xs px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium"
+          >
+            {expenseFiltersOpen ? 'Hide Filters' : 'Show Filters'}
+          </button>
         </div>
+
+        {expenseFiltersOpen && (
+          <div className="bg-[#f3efeb] border border-[#e5d9cd] rounded-xl px-4 py-3 shadow-sm mb-3 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
+              <select
+                value={expenseCategoryFilter}
+                onChange={(e) => setExpenseCategoryFilter(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="all">All categories</option>
+                {availableExpenseCategories.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Paid By</label>
+              <select
+                value={expensePaidByFilter}
+                onChange={(e) => setExpensePaidByFilter(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="all">Everyone</option>
+                {allMembers.map((member) => (
+                  <option key={member.id} value={member.id}>{member.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Sort By</label>
+              <select
+                value={expenseSortBy}
+                onChange={(e) => setExpenseSortBy(e.target.value as 'date' | 'category' | 'paid_by')}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="date">Date</option>
+                <option value="category">Category</option>
+                <option value="paid_by">Paid By</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Order</label>
+              <select
+                value={expenseSortOrder}
+                onChange={(e) => setExpenseSortOrder(e.target.value as 'desc' | 'asc')}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="desc">Descending</option>
+                <option value="asc">Ascending</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         {allExpenses.length === 0 ? (
           <div className="text-center py-10 text-gray-400">
@@ -581,55 +601,123 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           </div>
         ) : (
           <div className="bg-white border border-[#e5d9cd] rounded-2xl overflow-hidden shadow-sm">
-            <div className="hidden md:grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_auto] gap-3 px-5 py-3 bg-[#efe6df] border-b border-[#e5d9cd] text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-              <span>Expense</span>
-              <span>Paid by</span>
-              <span>Category</span>
-              <span>Date</span>
-              <span className="text-right">Amount</span>
-              <span className="text-right">Action</span>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full table-fixed">
+                <colgroup>
+                  <col className="w-[32%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[7%]" />
+                </colgroup>
+                <thead className="bg-[#efe6df] border-b border-[#e5d9cd]">
+                  <tr className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="text-left px-4 py-2">Expense</th>
+                    <th className="text-left px-4 py-2">Paid by</th>
+                    <th className="text-left px-4 py-2">Category</th>
+                    <th className="text-left px-4 py-2">Date</th>
+                    <th className="text-right px-4 py-2">Amount</th>
+                    <th className="text-right px-4 py-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleExpenses.map((expense) => (
+                    <tr key={expense.id} className="border-b border-[#f0e8e1] last:border-b-0 align-top">
+                      <td className="px-4 py-2.5">
+                        <p className="text-sm font-semibold text-gray-800 leading-tight">{expense.title}</p>
+                        {expense.notes && <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">{expense.notes}</p>}
+                        {(expense.splits?.length ?? 0) > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpenseSplits(expense.id)}
+                            className="text-[11px] text-indigo-600 hover:underline mt-1"
+                          >
+                            {expandedSplits[expense.id]
+                              ? `Hide splits`
+                              : `View splits (${expense.splits?.length ?? 0})`}
+                          </button>
+                        )}
+                        {expandedSplits[expense.id] && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {(expense.splits ?? []).map((s) => (
+                              <span key={s.id} className="text-[10px] bg-[#f3efeb] text-gray-600 rounded-full px-1.5 py-0.5">
+                                {s.member?.name}: {formatAmount(s.amount, expense.currency)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-sm text-gray-600">{expense.payer?.name ?? '-'}</td>
+                      <td className="px-4 py-2.5 text-sm text-gray-600">{expense.category?.name ?? 'Other'}</td>
+                      <td className="px-4 py-2.5 text-sm text-gray-600 whitespace-nowrap">{expense.date}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        <p className="font-bold text-gray-800 leading-tight">{formatAmount(expense.amount, expense.currency)}</p>
+                        {expense.currency !== group.default_currency && (
+                          <p className="text-[11px] text-gray-400 leading-tight">
+                            ≈ {formatAmount(expense.amount * expense.exchange_rate, group.default_currency)}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <Link
+                          href={`/groups/${group.id}/expenses/${expense.id}/edit`}
+                          className="text-[11px] text-indigo-600 hover:underline"
+                        >
+                          Edit
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {visibleExpenses.map((expense) => (
-              <div
-                key={expense.id}
-                className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_auto] gap-3 px-5 py-4 border-b border-[#f0e8e1] last:border-b-0"
-              >
-                <div>
-                  <p className="font-semibold text-gray-800">{expense.title}</p>
-                  {expense.notes && <p className="text-xs text-gray-400 mt-0.5">{expense.notes}</p>}
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {(expense.splits ?? []).slice(0, 3).map((s) => (
-                      <span key={s.id} className="text-[11px] bg-[#f3efeb] text-gray-600 rounded-full px-2 py-0.5">
-                        {s.member?.name}: {formatAmount(s.amount, expense.currency)}
-                      </span>
-                    ))}
+            <div className="md:hidden">
+              {visibleExpenses.map((expense) => (
+                <div key={expense.id} className="px-3 py-3 border-b border-[#f0e8e1] last:border-b-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 break-words leading-tight">{expense.title}</p>
+                      <p className="text-[11px] text-gray-500 mt-1 leading-tight">
+                        {expense.date} · {expense.category?.name ?? 'Other'} · {expense.payer?.name ?? '-'}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-gray-800 leading-tight">{formatAmount(expense.amount, expense.currency)}</p>
+                      <Link
+                        href={`/groups/${group.id}/expenses/${expense.id}/edit`}
+                        className="text-[11px] text-indigo-600 hover:underline mt-1 inline-block"
+                      >
+                        Edit
+                      </Link>
+                    </div>
                   </div>
-                </div>
 
-                <p className="text-sm text-gray-600 self-center">{expense.payer?.name ?? '-'}</p>
-                <p className="text-sm text-gray-600 self-center">{expense.category?.name ?? 'Other'}</p>
-                <p className="text-sm text-gray-600 self-center">{expense.date}</p>
+                  {(expense.splits?.length ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpenseSplits(expense.id)}
+                      className="text-[11px] text-indigo-600 hover:underline mt-1"
+                    >
+                      {expandedSplits[expense.id]
+                        ? `Hide splits`
+                        : `View splits (${expense.splits?.length ?? 0})`}
+                    </button>
+                  )}
 
-                <div className="text-left md:text-right self-center">
-                  <p className="font-bold text-gray-800">{formatAmount(expense.amount, expense.currency)}</p>
-                  {expense.currency !== group.default_currency && (
-                    <p className="text-xs text-gray-400">
-                      ≈ {formatAmount(expense.amount * expense.exchange_rate, group.default_currency)}
-                    </p>
+                  {expandedSplits[expense.id] && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {(expense.splits ?? []).map((s) => (
+                        <span key={s.id} className="text-[10px] bg-[#f3efeb] text-gray-600 rounded-full px-1.5 py-0.5">
+                          {s.member?.name}: {formatAmount(s.amount, expense.currency)}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
-
-                <div className="text-left md:text-right self-center">
-                  <Link
-                    href={`/groups/${group.id}/expenses/${expense.id}/edit`}
-                    className="text-xs text-indigo-600 hover:underline"
-                  >
-                    Edit
-                  </Link>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>
