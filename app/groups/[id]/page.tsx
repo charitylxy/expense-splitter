@@ -35,6 +35,10 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [expenseSortOrder, setExpenseSortOrder] = useState<'desc' | 'asc'>('desc')
   const [expenseFiltersOpen, setExpenseFiltersOpen] = useState(false)
   const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({})
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
+  const [personModalCategories, setPersonModalCategories] = useState<string[]>([])
+  const [personModalSortBy, setPersonModalSortBy] = useState<'date' | 'category'>('date')
+  const [personModalSortOrder, setPersonModalSortOrder] = useState<'desc' | 'asc'>('desc')
   const [loadingMessage, setLoadingMessage] = useState('Loading group...')
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -531,7 +535,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             Spent by Person {convertExpenses ? `(${group.default_currency})` : '(Per Currency)'}
           </h2>
           <div className="space-y-3">
-            {Object.values(spendSummary).map((summary) => {
+            {Object.entries(spendSummary).map(([memberId, summary]) => {
               const convertedCategoryEntries = Object.entries(summary.categories)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 6)
@@ -541,7 +545,17 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                 ? convertedCategoryEntries.length > 0
                 : perCurrencyCategoryEntries.length > 0
               return (
-                <div key={summary.name} className="bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm">
+                <button
+                  key={summary.name}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPersonId(memberId)
+                    setPersonModalCategories([])
+                    setPersonModalSortBy('date')
+                    setPersonModalSortOrder('desc')
+                  }}
+                  className="w-full text-left bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm hover:border-[#6794c1] hover:shadow-md transition cursor-pointer"
+                >
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-gray-800">{summary.name}</p>
                     <p className="text-sm font-bold text-gray-800">
@@ -568,7 +582,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                       ))
                     )}
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -787,6 +801,178 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           </div>
         )}
       </div>
+
+      {/* Person Expense Modal */}
+      {selectedPersonId && (() => {
+        const person = spendSummary[selectedPersonId]
+        if (!person) return null
+
+        // All expenses this person has a split in
+        const personExpenses = allExpenses.filter((e) =>
+          (e.splits ?? []).some((s) => s.member_id === selectedPersonId)
+        )
+
+        // All unique categories for this person
+        const personCategories = Array.from(
+          new Set(personExpenses.map((e) => e.category?.name ?? 'Other'))
+        ).sort((a, b) => a.localeCompare(b))
+
+        // Filtered expenses
+        const filteredExpenses = personExpenses
+          .filter((e) => {
+            if (personModalCategories.length === 0) return true
+            return personModalCategories.includes(e.category?.name ?? 'Other')
+          })
+          .sort((a, b) => {
+            let cmp = 0
+            if (personModalSortBy === 'date') {
+              cmp = a.date.localeCompare(b.date)
+            } else {
+              cmp = (a.category?.name ?? 'Other').localeCompare(b.category?.name ?? 'Other')
+            }
+            return personModalSortOrder === 'asc' ? cmp : -cmp
+          })
+
+        // Total: sum of this person's split amounts for filtered expenses
+        const filteredTotal = filteredExpenses.reduce((sum, e) => {
+          const split = (e.splits ?? []).find((s) => s.member_id === selectedPersonId)
+          if (!split) return sum
+          return sum + split.amount * e.exchange_rate
+        }, 0)
+
+        const filteredTotalByCurrency: Record<string, number> = {}
+        for (const e of filteredExpenses) {
+          const split = (e.splits ?? []).find((s) => s.member_id === selectedPersonId)
+          if (!split) continue
+          filteredTotalByCurrency[e.currency] = (filteredTotalByCurrency[e.currency] ?? 0) + split.amount
+        }
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-4"
+            onClick={() => setSelectedPersonId(null)}
+          >
+            <div
+              className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Expenses for</p>
+                  <h3 className="text-lg font-bold text-[#0b3d6e]">{person.name}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPersonId(null)}
+                  className="text-gray-400 hover:text-gray-600 transition text-xl leading-none px-1"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Filters */}
+              <div className="px-5 py-3 border-b border-gray-100 space-y-3">
+                {/* Category multi-select */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Filter by Category</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPersonModalCategories([])}
+                      className={`text-xs px-3 py-1 rounded-full font-medium transition ${personModalCategories.length === 0 ? 'bg-[#0b3d6e] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                      All
+                    </button>
+                    {personCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() =>
+                          setPersonModalCategories((prev) =>
+                            prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+                          )
+                        }
+                        className={`text-xs px-3 py-1 rounded-full font-medium transition ${personModalCategories.includes(cat) ? 'bg-[#0b3d6e] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sort controls */}
+                <div className="flex gap-2 items-center flex-wrap">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sort:</p>
+                  {(['date', 'category'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setPersonModalSortBy(opt)}
+                      className={`text-xs px-3 py-1 rounded-full font-medium transition ${personModalSortBy === opt ? 'bg-[#3a4f64] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                      {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPersonModalSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                    className="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium transition"
+                  >
+                    {personModalSortOrder === 'desc' ? '↓ Desc' : '↑ Asc'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Expense list */}
+              <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
+                {filteredExpenses.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-6">No expenses match the selected filters.</p>
+                ) : (
+                  filteredExpenses.map((expense) => {
+                    const split = (expense.splits ?? []).find((s) => s.member_id === selectedPersonId)
+                    return (
+                      <div key={expense.id} className="flex items-start justify-between gap-3 py-2 border-b border-gray-50 last:border-b-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 leading-tight">{expense.title}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {expense.date} · {expense.category?.name ?? 'Other'} · Paid by {expense.payer?.name ?? '-'}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-bold text-gray-800">
+                            {split ? formatAmount(split.amount, expense.currency) : '—'}
+                          </p>
+                          {split && expense.currency !== group.default_currency && (
+                            <p className="text-[11px] text-gray-400">
+                              ≈ {formatAmount(split.amount * expense.exchange_rate, group.default_currency)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Total footer */}
+              <div className="px-5 py-4 border-t border-gray-100 bg-[#f8f6f4] rounded-b-2xl">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-600">
+                    Total ({filteredExpenses.length} expense{filteredExpenses.length !== 1 ? 's' : ''})
+                  </p>
+                  <p className="text-base font-bold text-[#0b3d6e]">
+                    {convertExpenses
+                      ? formatAmount(filteredTotal, group.default_currency)
+                      : formatCurrencyBreakdown(filteredTotalByCurrency)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
