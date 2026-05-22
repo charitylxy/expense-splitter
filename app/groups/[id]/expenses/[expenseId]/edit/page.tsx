@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { Category, Member } from '@/lib/types'
 import { CURRENCIES, fetchExchangeRate } from '@/lib/utils'
 
+type SplitMode = 'equal' | 'custom' | 'percentage'
+
 type SplitRow = {
   id: string
   member_id: string
@@ -46,6 +48,9 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
   const [paidBy, setPaidBy] = useState('')
   const [date, setDate] = useState('')
   const [notes, setNotes] = useState('')
+  const [splitMode, setSplitMode] = useState<SplitMode>('custom')
+  const [splitValues, setSplitValues] = useState<Record<string, string>>({})
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([])
   const [baseExchangeRate, setBaseExchangeRate] = useState(1)
 
   const [loading, setLoading] = useState(true)
@@ -88,9 +93,28 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
         .eq('expense_id', expenseId)
         .order('id')
 
-      if (membersData) setMembers(membersData as Member[])
+      const memberRows = (membersData as Member[]) ?? []
+      const splitRows = (splitData as SplitRow[]) ?? []
+
+      if (memberRows.length > 0) {
+        setMembers(memberRows)
+
+        const selected =
+          splitRows.length > 0
+            ? splitRows.map((s) => s.member_id)
+            : memberRows.map((m) => m.id)
+        setSelectedMembers(selected)
+
+        const values: Record<string, string> = {}
+        memberRows.forEach((member) => {
+          const row = splitRows.find((s) => s.member_id === member.id)
+          values[member.id] = row ? String(row.amount) : ''
+        })
+        setSplitValues(values)
+      }
+
       if (categoryData) setCategories(categoryData as Category[])
-      if (splitData) setSplits(splitData as SplitRow[])
+      setSplits(splitRows)
 
       if (!expenseData) {
         setLoading(false)
@@ -107,45 +131,87 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
       setNotes(expense.notes ?? '')
       setBaseExchangeRate(expense.exchange_rate)
 
+      if (memberRows.length > 0 && !expense.paid_by) {
+        setPaidBy(memberRows[0].id)
+      }
+
       setLoading(false)
     }
 
     load()
   }, [id, expenseId])
 
-  async function updateSplitAmounts(newAmount: number) {
-    if (splits.length === 0) return
+  function toggleMember(memberId: string) {
+    setSelectedMembers((prev) =>
+      prev.includes(memberId)
+        ? prev.filter((id) => id !== memberId)
+        : [...prev, memberId]
+    )
+  }
 
-    const oldTotal = splits.reduce((sum, s) => sum + s.amount, 0)
-    let updates: { id: string; amount: number }[] = []
+  function computedSplits(): Record<string, number> {
+    const numAmount = parseFloat(amount) || 0
+    const result: Record<string, number> = {}
 
-    if (oldTotal <= 0) {
-      const even = round2(newAmount / splits.length)
-      let acc = 0
-      updates = splits.map((s, index) => {
-        if (index < splits.length - 1) {
-          acc += even
-          return { id: s.id, amount: even }
-        }
-        return { id: s.id, amount: round2(newAmount - acc) }
+    if (splitMode === 'equal') {
+      const each = selectedMembers.length > 0 ? numAmount / selectedMembers.length : 0
+      selectedMembers.forEach((id) => {
+        result[id] = round2(each)
+      })
+    } else if (splitMode === 'percentage') {
+      selectedMembers.forEach((id) => {
+        const pct = parseFloat(splitValues[id] || '0') / 100
+        result[id] = round2(numAmount * pct)
       })
     } else {
-      let acc = 0
-      updates = splits.map((s, index) => {
-        if (index < splits.length - 1) {
-          const nextAmount = round2((s.amount / oldTotal) * newAmount)
-          acc += nextAmount
-          return { id: s.id, amount: nextAmount }
-        }
-        return { id: s.id, amount: round2(newAmount - acc) }
+      selectedMembers.forEach((id) => {
+        result[id] = parseFloat(splitValues[id] || '0')
       })
     }
 
-    await Promise.all(
-      updates.map((u) =>
-        supabase.from('expense_splits').update({ amount: u.amount }).eq('id', u.id)
-      )
-    )
+    return result
+  }
+
+  async function persistSplits(nextSplits: Record<string, number>) {
+    const selectedSet = new Set(selectedMembers)
+    const toDeleteIds = splits
+      .filter((row) => !selectedSet.has(row.member_id))
+      .map((row) => row.id)
+
+    if (toDeleteIds.length > 0) {
+      const { error: deleteErr } = await supabase
+        .from('expense_splits')
+        .delete()
+        .in('id', toDeleteIds)
+
+      if (deleteErr) throw new Error(deleteErr.message)
+    }
+
+    const existingByMember = new Map(splits.map((row) => [row.member_id, row]))
+
+    for (const memberId of selectedMembers) {
+      const amountValue = nextSplits[memberId] ?? 0
+      const existing = existingByMember.get(memberId)
+
+      if (existing) {
+        const { error: updateErr } = await supabase
+          .from('expense_splits')
+          .update({ amount: amountValue })
+          .eq('id', existing.id)
+
+        if (updateErr) throw new Error(updateErr.message)
+      } else {
+        const { error: insertErr } = await supabase
+          .from('expense_splits')
+          .insert({
+            expense_id: expenseId,
+            member_id: memberId,
+            amount: amountValue,
+          })
+
+        if (insertErr) throw new Error(insertErr.message)
+      }
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -156,6 +222,16 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
     if (!title.trim()) return setError('Title is required')
     if (isNaN(numAmount) || numAmount <= 0) return setError('Enter a valid amount')
     if (!paidBy) return setError('Select who paid')
+
+    if (selectedMembers.length === 0) {
+      return setError('Select at least one member to split with')
+    }
+
+    const nextSplits = computedSplits()
+    const splitTotal = Object.values(nextSplits).reduce((sum, value) => sum + value, 0)
+    if (Math.abs(splitTotal - numAmount) > 0.02) {
+      return setError(`Split amounts (${splitTotal.toFixed(2)}) must equal the total (${numAmount.toFixed(2)})`)
+    }
 
     setSaving(true)
 
@@ -185,7 +261,13 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
       return
     }
 
-    await updateSplitAmounts(numAmount)
+    try {
+      await persistSplits(nextSplits)
+    } catch (splitErr) {
+      setSaving(false)
+      setError(splitErr instanceof Error ? splitErr.message : 'Failed to update splits')
+      return
+    }
 
     setSaving(false)
     router.push(`/groups/${id}`)
@@ -226,6 +308,10 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
       </div>
     )
   }
+
+  const currentSplits = computedSplits()
+  const currentSplitTotal = Object.values(currentSplits).reduce((sum, value) => sum + value, 0)
+  const currentAmount = parseFloat(amount) || 0
 
   return (
     <div className="space-y-6">
@@ -327,8 +413,78 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
           />
         </div>
 
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">Split</label>
+            <div className="flex gap-1">
+              {(['equal', 'custom', 'percentage'] as SplitMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setSplitMode(mode)}
+                  className={`text-xs px-3 py-1 rounded-full font-medium transition ${
+                    splitMode === mode
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {members.map((member) => (
+              <div key={member.id} className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedMembers.includes(member.id)}
+                  onChange={() => toggleMember(member.id)}
+                  className="rounded"
+                />
+                <span className="text-sm text-gray-700 flex-1">{member.name}</span>
+
+                {splitMode === 'equal' ? (
+                  <span className="text-sm text-gray-500 w-28 text-right">
+                    {selectedMembers.includes(member.id) && currentAmount > 0
+                      ? `${currency} ${(currentAmount / selectedMembers.length).toFixed(2)}`
+                      : '—'}
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={!selectedMembers.includes(member.id)}
+                      value={splitValues[member.id] ?? ''}
+                      onChange={(e) =>
+                        setSplitValues({
+                          ...splitValues,
+                          [member.id]: e.target.value,
+                        })
+                      }
+                      placeholder="0"
+                      className="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-right disabled:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    />
+                    <span className="text-xs text-gray-400">
+                      {splitMode === 'percentage' ? '%' : currency}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {splitMode !== 'equal' && currentAmount > 0 && (
+            <div className={`mt-2 text-xs text-right font-medium ${Math.abs(currentSplitTotal - currentAmount) > 0.02 ? 'text-red-500' : 'text-green-600'}`}>
+              Total split: {currentSplitTotal.toFixed(2)} / {currentAmount.toFixed(2)} {currency}
+            </div>
+          )}
+        </div>
+
         <p className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2">
-          Split rows will be kept and rebalanced proportionally if you change the amount.
           Current exchange rate: {baseExchangeRate.toFixed(4)}
         </p>
 
