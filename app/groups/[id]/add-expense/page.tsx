@@ -8,6 +8,10 @@ import { CURRENCIES, fetchExchangeRate } from '@/lib/utils'
 
 type SplitMode = 'equal' | 'custom' | 'percentage'
 
+type GroupCurrencyRow = {
+  default_currency: string
+}
+
 export default function AddExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -38,8 +42,9 @@ export default function AddExpensePage({ params }: { params: Promise<{ id: strin
         .eq('id', id)
         .single()
       if (group) {
-        setGroupCurrency(group.default_currency)
-        setCurrency(group.default_currency)
+        const groupRow = group as GroupCurrencyRow
+        setGroupCurrency(groupRow.default_currency)
+        setCurrency(groupRow.default_currency)
       }
       const { data: m } = await supabase
         .from('members')
@@ -48,14 +53,15 @@ export default function AddExpensePage({ params }: { params: Promise<{ id: strin
         .order('created_at')
       const { data: c } = await supabase.from('categories').select('*').order('name')
       if (m) {
-        setMembers(m)
-        setSelectedMembers(m.map((x: Member) => x.id))
-        setPaidBy(m[0]?.id ?? '')
+        const memberRows = m as Member[]
+        setMembers(memberRows)
+        setSelectedMembers(memberRows.map((x) => x.id))
+        setPaidBy(memberRows[0]?.id ?? '')
         const vals: Record<string, string> = {}
-        m.forEach((x: Member) => (vals[x.id] = ''))
+        memberRows.forEach((x) => (vals[x.id] = ''))
         setSplitValues(vals)
       }
-      if (c) setCategories(c)
+      if (c) setCategories(c as Category[])
     }
     load()
   }, [id])

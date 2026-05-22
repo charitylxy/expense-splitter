@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/lib/utils'
+import { useAuth } from '@/app/providers'
 
 type GroupData = {
   id: string
@@ -24,9 +25,17 @@ type ExistingMember = {
   name: string
 }
 
+type SharedUser = {
+  id: string
+  user_id: string
+  role: 'owner' | 'member'
+  email?: string
+}
+
 export default function EditGroupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const { session } = useAuth()
 
   const [group, setGroup] = useState<GroupData | null>(null)
   const [name, setName] = useState('')
@@ -36,10 +45,46 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
   const [originalMembers, setOriginalMembers] = useState<ExistingMember[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [error, setError] = useState('')
+  const [shareError, setShareError] = useState('')
+  const [shareEmail, setShareEmail] = useState('')
+  const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([])
+
+  async function loadSharedUsers(groupId: string, currentUserId?: string) {
+    const { data: sharedData } = await supabase
+      .from('group_members')
+      .select('id, user_id, role')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: true })
+
+    const memberships = ((sharedData ?? []) as SharedUser[]).filter((m) => m.user_id !== currentUserId)
+    if (memberships.length === 0) {
+      setSharedUsers([])
+      return
+    }
+
+    const userIds = memberships.map((m) => m.user_id)
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .in('id', userIds)
+
+    const emailById = new Map<string, string>(
+      (profiles ?? []).map((p: { id: string; email: string }) => [p.id, p.email])
+    )
+    setSharedUsers(
+      memberships.map((m) => ({
+        ...m,
+        email: emailById.get(m.user_id),
+      }))
+    )
+  }
 
   useEffect(() => {
     async function load() {
+      const userId = session?.user?.id
+
       const { data } = await supabase
         .from('groups')
         .select('*')
@@ -64,18 +109,104 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
       setDescription(groupData.description ?? '')
       setCurrency(groupData.default_currency)
       setMembers(
-        (memberData ?? []).map((m) => ({
+        (memberData ?? []).map((m: ExistingMember) => ({
           id: m.id,
           name: m.name,
           isNew: false,
         }))
       )
+      await loadSharedUsers(id, userId)
       setOriginalMembers((memberData ?? []) as ExistingMember[])
       setLoading(false)
     }
 
     load()
-  }, [id])
+  }, [id, session?.user?.id])
+
+  async function handleShareUser() {
+    setShareError('')
+    const email = shareEmail.trim().toLowerCase()
+
+    if (!email) {
+      setShareError('Enter an email address to share this group.')
+      return
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailPattern.test(email)) {
+      setShareError('Enter a valid email address.')
+      return
+    }
+
+    const { data: profile, error: profileErr } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (profileErr) {
+      setShareError(profileErr.message)
+      return
+    }
+
+    if (!profile) {
+      setShareError('No account found with that email. They need to sign up first.')
+      return
+    }
+
+    const userId = profile.id as string
+
+    if (userId === session?.user?.id) {
+      setShareError('You already own this group.')
+      return
+    }
+
+    if (sharedUsers.some((u) => u.user_id === userId)) {
+      setShareError('This user already has access.')
+      return
+    }
+
+    setSharing(true)
+    const { data, error: insertErr } = await supabase
+      .from('group_members')
+      .insert({
+        group_id: id,
+        user_id: userId,
+        role: 'member',
+      })
+      .select('id, user_id, role')
+      .single()
+
+    setSharing(false)
+
+    if (insertErr || !data) {
+      setShareError(insertErr?.message ?? 'Failed to share group.')
+      return
+    }
+
+    setSharedUsers((prev) => [...prev, { ...(data as SharedUser), email }])
+    setShareEmail('')
+  }
+
+  async function handleRemoveSharedUser(sharedId: string) {
+    setShareError('')
+    setSharing(true)
+
+    const { error: deleteErr } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('id', sharedId)
+      .eq('group_id', id)
+
+    setSharing(false)
+
+    if (deleteErr) {
+      setShareError(deleteErr.message)
+      return
+    }
+
+    setSharedUsers((prev) => prev.filter((u) => u.id !== sharedId))
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -348,6 +479,60 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
           </button>
         </div>
       </form>
+
+      <div className="space-y-4 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 className="text-lg font-semibold text-gray-800">Share Group</h2>
+        <p className="text-sm text-gray-500">
+          Share this group by email. If that email already has an account, they get access instantly.
+        </p>
+
+        {shareError && <p className="text-red-600 text-sm bg-red-50 rounded p-3">{shareError}</p>}
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="email"
+            value={shareEmail}
+            onChange={(e) => setShareEmail(e.target.value)}
+            placeholder="friend@example.com"
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          />
+          <button
+            type="button"
+            onClick={handleShareUser}
+            disabled={sharing}
+            className="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50"
+          >
+            {sharing ? 'Sharing...' : 'Share Access'}
+          </button>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-2">Shared Users</p>
+          {sharedUsers.length === 0 ? (
+            <p className="text-sm text-gray-500">No shared users yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {sharedUsers.map((user) => (
+                <div key={user.id} className="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800 break-all">{user.email ?? user.user_id}</p>
+                    <p className="text-xs text-gray-500 break-all">{user.user_id}</p>
+                    <p className="text-xs text-gray-500 capitalize">Role: {user.role}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSharedUser(user.id)}
+                    disabled={sharing}
+                    className="text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

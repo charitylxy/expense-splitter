@@ -43,12 +43,37 @@ export default function HomePage() {
 
         if (!session?.user?.id) return
 
-        // Fetch groups owned by user OR groups user is a member of
-        const { data, error } = await supabase
+        const userId = session.user.id
+
+        // Step 1: Fetch shared group IDs for this user.
+        const { data: memberships, error: membershipError } = await supabase
+          .from('group_members')
+          .select('group_id')
+          .eq('user_id', userId)
+
+        if (membershipError) {
+          if (cancelled) return
+          setLoadError(membershipError.message)
+          setLoading(false)
+          return
+        }
+
+        const sharedGroupIds = (memberships ?? []).map((m: { group_id: string }) => m.group_id)
+
+        // Step 2: Fetch groups owned by user plus any shared groups.
+        let groupsQuery = supabase
           .from('groups')
           .select('*')
-          .or(`created_by.eq.${session.user.id},id.in.(select group_id from group_members where user_id = '${session.user.id}')`)
           .order('created_at', { ascending: false })
+
+        if (sharedGroupIds.length > 0) {
+          const quotedIds = sharedGroupIds.map((id: string) => `"${id}"`).join(',')
+          groupsQuery = groupsQuery.or(`created_by.eq.${userId},id.in.(${quotedIds})`)
+        } else {
+          groupsQuery = groupsQuery.eq('created_by', userId)
+        }
+
+        const { data, error } = await groupsQuery
 
         if (cancelled) return
 

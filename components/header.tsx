@@ -21,7 +21,7 @@ export function Header() {
 
   return (
     <header className="px-4 pt-4">
-      <div className="max-w-2xl mx-auto rounded-2xl overflow-hidden shadow bg-white/70 border border-white/60">
+      <div className="max-w-2xl mx-auto rounded-2xl shadow bg-white/70 border border-white/60">
         <div className="h-2 w-full flex">
           <span className="w-1/6 bg-[#0b3d6e]" />
           <span className="w-1/6 bg-[#6794c1]" />
