@@ -181,6 +181,15 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     }))
   }
 
+  function goToExpensePage(pageNumber: number) {
+    if (!Number.isFinite(pageNumber)) {
+      return
+    }
+
+    const clampedPage = Math.min(Math.max(1, pageNumber), expenseTotalPages)
+    setExpensePage(clampedPage - 1)
+  }
+
   if (loading) {
     return <div className="text-gray-500">{loadingMessage}</div>
   }
@@ -253,7 +262,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       return expenseSortOrder === 'asc' ? compare : -compare
     })
 
-  const EXPENSE_PAGE_SIZE = 15
+  const EXPENSE_PAGE_SIZE = 10
   const expenseTotalPages = Math.ceil(visibleExpenses.length / EXPENSE_PAGE_SIZE)
   const pagedExpenses = visibleExpenses.slice(expensePage * EXPENSE_PAGE_SIZE, (expensePage + 1) * EXPENSE_PAGE_SIZE)
 
@@ -546,7 +555,11 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <button
             type="button"
             onClick={() => setExpenseFiltersOpen((prev) => !prev)}
-            className="text-xs px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium"
+            className={`text-xs px-3 py-1 rounded-lg border font-medium transition ${
+              expenseFiltersOpen
+                ? 'bg-[#efe6df] border-[#e5d9cd] text-[#3a4f64]'
+                : 'bg-white border-[#e5d9cd] text-gray-600 hover:bg-[#f8f6f4]'
+            }`}
           >
             {expenseFiltersOpen ? 'Hide Filters' : 'Show Filters'}
           </button>
@@ -621,7 +634,42 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             <p>No expenses match the selected filters.</p>
           </div>
         ) : (
-          <div className="bg-white border border-[#e5d9cd] rounded-2xl overflow-hidden shadow-sm">
+          <>
+            {visibleExpenses.length > EXPENSE_PAGE_SIZE && (
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  type="button"
+                  onClick={() => setExpensePage((p) => Math.max(0, p - 1))}
+                  disabled={expensePage === 0}
+                  className="text-xs px-3 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
+                >
+                  ← Previous
+                </button>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span>Page</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={expenseTotalPages}
+                    value={expensePage + 1}
+                    onChange={(e) => goToExpensePage(Number(e.target.value))}
+                    className="w-10 rounded-md border border-[#e5d9cd] bg-white px-1 py-0.5 text-center text-[11px] text-gray-700"
+                    aria-label="Go to expense page"
+                  />
+                  <span>of {expenseTotalPages} · {visibleExpenses.length} expenses</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpensePage((p) => Math.min(expenseTotalPages - 1, p + 1))}
+                  disabled={expensePage >= expenseTotalPages - 1}
+                  className="text-xs px-3 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+
+            <div className="bg-white border border-[#e5d9cd] rounded-2xl overflow-hidden shadow-sm">
             <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full table-fixed">
                 <colgroup>
@@ -645,22 +693,22 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                 <tbody>
                   {pagedExpenses.map((expense) => (
                     <tr key={expense.id} className="border-b border-[#f0e8e1] last:border-b-0 align-top">
-                      <td className="px-4 py-2.5">
-                        <p className="text-sm font-semibold text-gray-800 leading-tight">{expense.title}</p>
-                        {expense.notes && <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">{expense.notes}</p>}
+                        <td className="px-4 py-1.5">
+                          <p className="text-[13px] font-semibold text-gray-800 leading-tight">{expense.title}</p>
+                          {expense.notes && <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{expense.notes}</p>}
                         {(expense.splits?.length ?? 0) > 0 && (
                           <button
                             type="button"
                             onClick={() => toggleExpenseSplits(expense.id)}
-                            className="text-[11px] text-indigo-600 hover:underline mt-1"
+                              className="text-[10px] text-indigo-600 hover:underline mt-0.5"
                           >
                             {expandedSplits[expense.id]
                               ? `Hide splits`
                               : `View splits (${expense.splits?.length ?? 0})`}
                           </button>
                         )}
-                        {expandedSplits[expense.id] && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
+                          {expandedSplits[expense.id] && (
+                            <div className="flex flex-wrap gap-1 mt-1">
                             {(expense.splits ?? []).map((s) => (
                               <span key={s.id} className="text-[10px] bg-[#f3efeb] text-gray-600 rounded-full px-1.5 py-0.5">
                                 {s.member?.name}: {formatAmount(s.amount, expense.currency)}
@@ -669,21 +717,21 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-sm text-gray-600">{expense.payer?.name ?? '-'}</td>
-                      <td className="px-4 py-2.5 text-sm text-gray-600">{expense.category?.name ?? 'Other'}</td>
-                      <td className="px-4 py-2.5 text-sm text-gray-600 whitespace-nowrap">{expense.date}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <p className="font-bold text-gray-800 leading-tight">{formatAmount(expense.amount, expense.currency)}</p>
+                        <td className="px-4 py-1.5 text-[13px] text-gray-600">{expense.payer?.name ?? '-'}</td>
+                        <td className="px-4 py-1.5 text-[13px] text-gray-600">{expense.category?.name ?? 'Other'}</td>
+                        <td className="px-4 py-1.5 text-[13px] text-gray-600 whitespace-nowrap">{expense.date}</td>
+                        <td className="px-4 py-1.5 text-right">
+                          <p className="text-[13px] font-bold text-gray-800 leading-tight">{formatAmount(expense.amount, expense.currency)}</p>
                         {expense.currency !== group.default_currency && (
-                          <p className="text-[11px] text-gray-400 leading-tight">
+                            <p className="text-[10px] text-gray-400 leading-tight">
                             ≈ {formatAmount(expense.amount * expense.exchange_rate, group.default_currency)}
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-right">
+                        <td className="px-4 py-1.5 text-right">
                         <Link
                           href={`/groups/${group.id}/expenses/${expense.id}/edit`}
-                          className="text-[11px] text-indigo-600 hover:underline"
+                            className="text-[10px] text-indigo-600 hover:underline"
                         >
                           Edit
                         </Link>
@@ -696,19 +744,19 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
             <div className="md:hidden">
               {pagedExpenses.map((expense) => (
-                <div key={expense.id} className="px-3 py-3 border-b border-[#f0e8e1] last:border-b-0">
+                <div key={expense.id} className="px-3 py-2 border-b border-[#f0e8e1] last:border-b-0">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 break-words leading-tight">{expense.title}</p>
-                      <p className="text-[11px] text-gray-500 mt-1 leading-tight">
+                      <p className="text-[13px] font-semibold text-gray-800 break-words leading-tight">{expense.title}</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
                         {expense.date} · {expense.category?.name ?? 'Other'} · {expense.payer?.name ?? '-'}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-gray-800 leading-tight">{formatAmount(expense.amount, expense.currency)}</p>
+                      <p className="text-[13px] font-bold text-gray-800 leading-tight">{formatAmount(expense.amount, expense.currency)}</p>
                       <Link
                         href={`/groups/${group.id}/expenses/${expense.id}/edit`}
-                        className="text-[11px] text-indigo-600 hover:underline mt-1 inline-block"
+                        className="text-[10px] text-indigo-600 hover:underline mt-0.5 inline-block"
                       >
                         Edit
                       </Link>
@@ -719,7 +767,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                     <button
                       type="button"
                       onClick={() => toggleExpenseSplits(expense.id)}
-                      className="text-[11px] text-indigo-600 hover:underline mt-1"
+                      className="text-[10px] text-indigo-600 hover:underline mt-0.5"
                     >
                       {expandedSplits[expense.id]
                         ? `Hide splits`
@@ -728,7 +776,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   )}
 
                   {expandedSplits[expense.id] && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
+                    <div className="flex flex-wrap gap-1 mt-1">
                       {(expense.splits ?? []).map((s) => (
                         <span key={s.id} className="text-[10px] bg-[#f3efeb] text-gray-600 rounded-full px-1.5 py-0.5">
                           {s.member?.name}: {formatAmount(s.amount, expense.currency)}
@@ -739,32 +787,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Pagination controls */}
-        {visibleExpenses.length > EXPENSE_PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-3">
-            <button
-              type="button"
-              onClick={() => setExpensePage((p) => Math.max(0, p - 1))}
-              disabled={expensePage === 0}
-              className="text-sm px-4 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
-            >
-              ← Previous
-            </button>
-            <span className="text-xs text-gray-500">
-              Page {expensePage + 1} of {expenseTotalPages} · {visibleExpenses.length} expenses
-            </span>
-            <button
-              type="button"
-              onClick={() => setExpensePage((p) => Math.min(expenseTotalPages - 1, p + 1))}
-              disabled={expensePage >= expenseTotalPages - 1}
-              className="text-sm px-4 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
-            >
-              Next →
-            </button>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
