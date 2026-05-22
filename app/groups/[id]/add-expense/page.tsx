@@ -4,7 +4,7 @@ import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Member, Category } from '@/lib/types'
-import { CURRENCIES, fetchExchangeRate } from '@/lib/utils'
+import { CURRENCIES, fetchExchangeRate, splitAmountExactly } from '@/lib/utils'
 
 type SplitMode = 'equal' | 'custom' | 'percentage'
 
@@ -88,8 +88,7 @@ export default function AddExpensePage({ params }: { params: Promise<{ id: strin
     const result: Record<string, number> = {}
 
     if (splitMode === 'equal') {
-      const each = selectedMembers.length > 0 ? num / selectedMembers.length : 0
-      selectedMembers.forEach((id) => (result[id] = Math.round(each * 100) / 100))
+      return splitAmountExactly(num, selectedMembers)
     } else if (splitMode === 'percentage') {
       selectedMembers.forEach((id) => {
         const pct = parseFloat(splitValues[id] || '0') / 100
@@ -295,7 +294,7 @@ export default function AddExpensePage({ params }: { params: Promise<{ id: strin
                 {splitMode === 'equal' ? (
                   <span className="text-sm text-gray-500 w-24 text-right">
                     {selectedMembers.includes(m.id) && num > 0
-                      ? `${currency} ${(num / selectedMembers.length).toFixed(2)}`
+                      ? `${currency} ${(splits[m.id] ?? 0).toFixed(2)}`
                       : '—'}
                   </span>
                 ) : (

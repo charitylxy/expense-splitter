@@ -39,6 +39,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [personModalCategories, setPersonModalCategories] = useState<string[]>([])
   const [personModalSortBy, setPersonModalSortBy] = useState<'date' | 'category'>('date')
   const [personModalSortOrder, setPersonModalSortOrder] = useState<'desc' | 'asc'>('desc')
+  const [expensePage, setExpensePage] = useState(0)
   const [loadingMessage, setLoadingMessage] = useState('Loading group...')
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -49,6 +50,10 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       setConvertExpenses(saved === 'true')
     }
   }, [id])
+
+  useEffect(() => {
+    setExpensePage(0)
+  }, [expenseCategoryFilter, expensePaidByFilter, expenseSortBy, expenseSortOrder])
 
   useEffect(() => {
     let cancelled = false
@@ -248,6 +253,10 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       return expenseSortOrder === 'asc' ? compare : -compare
     })
 
+  const EXPENSE_PAGE_SIZE = 15
+  const expenseTotalPages = Math.ceil(visibleExpenses.length / EXPENSE_PAGE_SIZE)
+  const pagedExpenses = visibleExpenses.slice(expensePage * EXPENSE_PAGE_SIZE, (expensePage + 1) * EXPENSE_PAGE_SIZE)
+
   const settlementTransactions = settlements.map((s) => ({
     amount: s.amount,
     currency: s.currency,
@@ -383,37 +392,37 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{group.name}</h1>
           {group.description && <p className="text-gray-500 text-sm">{group.description}</p>}
           <p className="text-xs text-gray-400 mt-1">Base currency: {group.default_currency}</p>
-
-          <div className="mt-3">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Members</h2>
-            <div className="flex flex-wrap gap-2">
-              {allMembers.map((m) => (
-                <span key={m.id} className="bg-indigo-50 text-indigo-700 text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap">
-                  {m.name}
-                </span>
-              ))}
-            </div>
-          </div>
         </div>
-        <div className="flex flex-wrap gap-2 w-full md:w-auto md:justify-end">
+        <div className="flex gap-2 shrink-0 flex-wrap">
           <Link
             href={`/groups/${group.id}/edit`}
-            className="flex-1 sm:flex-none text-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition whitespace-nowrap"
+            className="text-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition whitespace-nowrap"
           >
             Edit Group
           </Link>
           <Link
             href={`/groups/${group.id}/settle-up`}
-            className="flex-1 sm:flex-none text-center bg-[#ff6a00] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#f1ad63] hover:text-[#1f2937] transition whitespace-nowrap"
+            className="text-center bg-[#ff6a00] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#f1ad63] hover:text-[#1f2937] transition whitespace-nowrap"
           >
             Settle Up
           </Link>
           <Link
             href={`/groups/${group.id}/add-expense`}
-            className="flex-1 sm:flex-none text-center bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition whitespace-nowrap"
+            className="text-center bg-[#0b3d6e] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#3a4f64] transition whitespace-nowrap"
           >
             + Add Expense
           </Link>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Members</h2>
+        <div className="flex flex-wrap gap-2">
+          {allMembers.map((m) => (
+            <span key={m.id} className="bg-indigo-50 text-indigo-700 text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap">
+              {m.name}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -528,74 +537,6 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      {/* Spend Summary */}
-      {Object.keys(spendSummary).length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Spent by Person {convertExpenses ? `(${group.default_currency})` : '(Per Currency)'}
-          </h2>
-          <div className="space-y-3">
-            {Object.entries(spendSummary).map(([memberId, summary]) => {
-              const convertedCategoryEntries = Object.entries(summary.categories)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 6)
-              const perCurrencyCategoryEntries = Object.entries(summary.categoriesByCurrency)
-
-              const hasEntries = convertExpenses
-                ? convertedCategoryEntries.length > 0
-                : perCurrencyCategoryEntries.length > 0
-              return (
-                <button
-                  key={summary.name}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPersonId(memberId)
-                    setPersonModalCategories([])
-                    setPersonModalSortBy('date')
-                    setPersonModalSortOrder('desc')
-                  }}
-                  className="w-full text-left bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm hover:border-[#6794c1] hover:shadow-md transition cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold text-gray-800">{summary.name}</p>
-                    <p className="text-sm font-bold text-gray-800">
-                      {convertExpenses
-                        ? formatAmount(summary.total, group.default_currency)
-                        : formatCurrencyBreakdown(summary.totalByCurrency)}
-                    </p>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {!hasEntries ? (
-                      <span className="text-xs text-gray-400">No paid expenses yet.</span>
-                    ) : convertExpenses ? (
-                      convertedCategoryEntries.map(([cat, amount]) => (
-                        <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
-                          {cat}: {formatAmount(amount, group.default_currency)}
-                        </span>
-                      ))
-                    ) : (
-                      perCurrencyCategoryEntries.map(([cat, values]) => (
-                        <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
-                          {cat}: {formatCurrencyBreakdown(values)}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          <p className="text-sm font-semibold text-gray-600 mt-3 text-right">
-            Total Spent:{' '}
-            {convertExpenses
-              ? formatAmount(totalSpendConverted, group.default_currency)
-              : formatCurrencyBreakdown(totalSpendByCurrency)}
-          </p>
-        </div>
-      )}
-
       {/* Expenses List */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -702,7 +643,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleExpenses.map((expense) => (
+                  {pagedExpenses.map((expense) => (
                     <tr key={expense.id} className="border-b border-[#f0e8e1] last:border-b-0 align-top">
                       <td className="px-4 py-2.5">
                         <p className="text-sm font-semibold text-gray-800 leading-tight">{expense.title}</p>
@@ -754,7 +695,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             </div>
 
             <div className="md:hidden">
-              {visibleExpenses.map((expense) => (
+              {pagedExpenses.map((expense) => (
                 <div key={expense.id} className="px-3 py-3 border-b border-[#f0e8e1] last:border-b-0">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -800,7 +741,97 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             </div>
           </div>
         )}
+
+        {/* Pagination controls */}
+        {visibleExpenses.length > EXPENSE_PAGE_SIZE && (
+          <div className="flex items-center justify-between mt-3">
+            <button
+              type="button"
+              onClick={() => setExpensePage((p) => Math.max(0, p - 1))}
+              disabled={expensePage === 0}
+              className="text-sm px-4 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
+            >
+              ← Previous
+            </button>
+            <span className="text-xs text-gray-500">
+              Page {expensePage + 1} of {expenseTotalPages} · {visibleExpenses.length} expenses
+            </span>
+            <button
+              type="button"
+              onClick={() => setExpensePage((p) => Math.min(expenseTotalPages - 1, p + 1))}
+              disabled={expensePage >= expenseTotalPages - 1}
+              className="text-sm px-4 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed font-medium transition"
+            >
+              Next →
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Spend Summary */}
+      {Object.keys(spendSummary).length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Spending Summary {convertExpenses ? `(${group.default_currency})` : '(Per Currency)'}
+          </h2>
+          <div className="space-y-3">
+            {Object.entries(spendSummary).map(([memberId, summary]) => {
+              const convertedCategoryEntries = Object.entries(summary.categories)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6)
+              const perCurrencyCategoryEntries = Object.entries(summary.categoriesByCurrency)
+              const hasEntries = convertExpenses
+                ? convertedCategoryEntries.length > 0
+                : perCurrencyCategoryEntries.length > 0
+              return (
+                <button
+                  key={summary.name}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPersonId(memberId)
+                    setPersonModalCategories([])
+                    setPersonModalSortBy('date')
+                    setPersonModalSortOrder('desc')
+                  }}
+                  className="w-full text-left bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm hover:border-[#6794c1] hover:shadow-md transition cursor-pointer"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-gray-800">{summary.name}</p>
+                    <p className="text-sm font-bold text-gray-800">
+                      {convertExpenses
+                        ? formatAmount(summary.total, group.default_currency)
+                        : formatCurrencyBreakdown(summary.totalByCurrency)}
+                    </p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {!hasEntries ? (
+                      <span className="text-xs text-gray-400">No paid expenses yet.</span>
+                    ) : convertExpenses ? (
+                      convertedCategoryEntries.map(([cat, amount]) => (
+                        <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+                          {cat}: {formatAmount(amount, group.default_currency)}
+                        </span>
+                      ))
+                    ) : (
+                      perCurrencyCategoryEntries.map(([cat, values]) => (
+                        <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+                          {cat}: {formatCurrencyBreakdown(values)}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-sm font-semibold text-gray-600 mt-3 text-right">
+            Total Spent:{' '}
+            {convertExpenses
+              ? formatAmount(totalSpendConverted, group.default_currency)
+              : formatCurrencyBreakdown(totalSpendByCurrency)}
+          </p>
+        </div>
+      )}
 
       {/* Person Expense Modal */}
       {selectedPersonId && (() => {

@@ -36,6 +36,44 @@ export function formatAmount(amount: number, currency: string): string {
   return `${sym}${amount.toFixed(2)}`
 }
 
+function hashString(value: string): number {
+  let hash = 0
+
+  for (let index = 0; index < value.length; index++) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0
+  }
+
+  return hash
+}
+
+export function splitAmountExactly(total: number, memberIds: string[]): Record<string, number> {
+  if (memberIds.length === 0) {
+    return {}
+  }
+
+  const totalCents = Math.round(total * 100)
+  const baseCents = Math.floor(totalCents / memberIds.length)
+  const remainder = totalCents % memberIds.length
+  const result = Object.fromEntries(memberIds.map((memberId) => [memberId, baseCents])) as Record<string, number>
+
+  // Use a stable pseudo-random order so remainder cents are spread without biasing the first member.
+  const seededOrder = [...memberIds].sort((left, right) => {
+    const leftHash = hashString(`${totalCents}:${left}`)
+    const rightHash = hashString(`${totalCents}:${right}`)
+    return leftHash - rightHash
+  })
+
+  for (let index = 0; index < remainder; index++) {
+    result[seededOrder[index]] += 1
+  }
+
+  for (const memberId of memberIds) {
+    result[memberId] = result[memberId] / 100
+  }
+
+  return result
+}
+
 export function calculateBalances(
   expenses: {
     amount: number
