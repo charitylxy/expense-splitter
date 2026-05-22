@@ -298,8 +298,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
           <Link href="/" className="text-sm text-indigo-600 hover:underline">← Groups</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{group.name}</h1>
           {group.description && <p className="text-gray-500 text-sm">{group.description}</p>}
@@ -309,29 +309,29 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Members</h2>
             <div className="flex flex-wrap gap-2">
               {allMembers.map((m) => (
-                <span key={m.id} className="bg-indigo-50 text-indigo-700 text-sm px-3 py-1 rounded-full font-medium">
+                <span key={m.id} className="bg-indigo-50 text-indigo-700 text-sm px-3 py-1 rounded-full font-medium whitespace-nowrap">
                   {m.name}
                 </span>
               ))}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap gap-2 w-full md:w-auto md:justify-end">
           <Link
             href={`/groups/${group.id}/edit`}
-            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition whitespace-nowrap"
+            className="flex-1 sm:flex-none text-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition whitespace-nowrap"
           >
             Edit Group
           </Link>
           <Link
             href={`/groups/${group.id}/settle-up`}
-            className="bg-[#ff6a00] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#f1ad63] hover:text-[#1f2937] transition whitespace-nowrap"
+            className="flex-1 sm:flex-none text-center bg-[#ff6a00] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#f1ad63] hover:text-[#1f2937] transition whitespace-nowrap"
           >
             Settle Up
           </Link>
           <Link
             href={`/groups/${group.id}/add-expense`}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition whitespace-nowrap"
+            className="flex-1 sm:flex-none text-center bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition whitespace-nowrap"
           >
             + Add Expense
           </Link>
@@ -347,11 +347,11 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
       <div className="bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm">
         <p className="text-sm font-semibold text-gray-700">Currency Display</p>
-        <div className="flex gap-2 mt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
           <button
             type="button"
             onClick={() => handleConversionChange(true)}
-            className={`text-sm px-3 py-1.5 rounded-full font-medium transition ${
+            className={`w-full text-sm px-3 py-1.5 rounded-full font-medium transition ${
               convertExpenses ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -360,7 +360,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <button
             type="button"
             onClick={() => handleConversionChange(false)}
-            className={`text-sm px-3 py-1.5 rounded-full font-medium transition ${
+            className={`w-full text-sm px-3 py-1.5 rounded-full font-medium transition ${
               !convertExpenses ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -416,7 +416,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             Settlements
           </h2>
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <p className="text-sm text-gray-600">
                 {settlements.length === 0
@@ -434,7 +434,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             </div>
             <Link
               href={`/groups/${group.id}/settlements`}
-              className="text-sm text-indigo-600 hover:underline font-medium whitespace-nowrap"
+              className="text-sm text-indigo-600 hover:underline font-medium whitespace-nowrap self-start"
             >
               View all settlements →
             </Link>
