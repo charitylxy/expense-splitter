@@ -2,11 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { CURRENCIES } from '@/lib/utils'
+import { useAuth } from '@/app/providers'
 
 export default function NewGroupPage() {
   const router = useRouter()
+  const { session } = useAuth()
+  const supabase = createClient()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [currency, setCurrency] = useState('USD')
@@ -25,6 +28,12 @@ export default function NewGroupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    if (!session?.user?.id) {
+      setError('You must be logged in to create a group')
+      return
+    }
+
     const validMembers = members.map((m) => m.trim()).filter(Boolean)
     if (!name.trim()) return setError('Group name is required')
     if (validMembers.length < 2) return setError('Add at least 2 members')
@@ -32,7 +41,12 @@ export default function NewGroupPage() {
     setLoading(true)
     const { data: group, error: groupErr } = await supabase
       .from('groups')
-      .insert({ name: name.trim(), description: description.trim() || null, default_currency: currency })
+      .insert({
+        name: name.trim(),
+        description: description.trim() || null,
+        default_currency: currency,
+        created_by: session.user.id,
+      })
       .select()
       .single()
 
@@ -155,3 +169,4 @@ export default function NewGroupPage() {
     </div>
   )
 }
+

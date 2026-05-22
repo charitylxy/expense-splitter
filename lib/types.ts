@@ -3,6 +3,15 @@ export interface Group {
   name: string
   description: string | null
   default_currency: string
+  created_by: string | null
+  created_at: string
+}
+
+export interface GroupMember {
+  id: string
+  group_id: string
+  user_id: string
+  role: 'owner' | 'member'
   created_at: string
 }
 

@@ -1,18 +1,32 @@
-"use client"
+'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Group } from '@/lib/types'
 import Link from 'next/link'
 import { isLikelyWakeUpError } from '@/lib/utils'
+import { useAuth } from '@/app/providers'
 
 export default function HomePage() {
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMessage, setLoadingMessage] = useState('Loading groups...')
   const [loadError, setLoadError] = useState('')
+  const { session, loading: authLoading } = useAuth()
+  const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
+    if (!authLoading && !session) {
+      router.push('/auth/login')
+      return
+    }
+  }, [session, authLoading, router])
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+
     let cancelled = false
 
     async function loadGroups() {
@@ -27,9 +41,13 @@ export default function HomePage() {
           setLoadingMessage('Loading groups...')
         }
 
+        if (!session?.user?.id) return
+
+        // Fetch groups owned by user OR groups user is a member of
         const { data, error } = await supabase
           .from('groups')
           .select('*')
+          .or(`created_by.eq.${session.user.id},id.in.(select group_id from group_members where user_id = '${session.user.id}')`)
           .order('created_at', { ascending: false })
 
         if (cancelled) return
@@ -57,7 +75,11 @@ export default function HomePage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [session?.user?.id, supabase])
+
+  if (authLoading || !session) {
+    return <div className="text-center py-20 text-gray-400">Loading...</div>
+  }
 
   return (
     <div>
