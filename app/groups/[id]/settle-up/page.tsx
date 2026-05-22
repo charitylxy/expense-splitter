@@ -148,7 +148,7 @@ export default function SettleUpPage({ params }: { params: Promise<{ id: string 
         <h1 className="text-2xl font-bold text-gray-800 mt-1">Settle Up</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <form onSubmit={handleSubmit} className="space-y-5 bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
         {error && <p className="text-red-600 text-sm bg-red-50 rounded p-3">{error}</p>}
 
         {!featureReady && (
@@ -157,7 +157,7 @@ export default function SettleUpPage({ params }: { params: Promise<{ id: string 
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Paid By *</label>
             <select
@@ -184,7 +184,7 @@ export default function SettleUpPage({ params }: { params: Promise<{ id: string 
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
             <input

@@ -247,7 +247,7 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
             <input
@@ -279,7 +279,7 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
             <input
@@ -332,7 +332,7 @@ export default function EditExpensePage({ params }: { params: Promise<{ id: stri
           Current exchange rate: {baseExchangeRate.toFixed(4)}
         </p>
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button
             type="submit"
             disabled={saving}
