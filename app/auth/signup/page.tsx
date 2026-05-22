@@ -39,7 +39,7 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-[72vh] flex items-start sm:items-center justify-center bg-gradient-to-b from-slate-50 to-white px-4 pt-6 sm:pt-0">
+    <div className="min-h-[72vh] flex items-start sm:items-center justify-center bg-white px-4 pt-6 sm:pt-0">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
           <h1 className="text-3xl font-bold text-navy-900 mb-2">Expense Splitter</h1>
@@ -100,7 +100,7 @@ export default function SignUpPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="w-full bg-[#0b3d6e] text-white font-semibold py-2 rounded-lg hover:bg-[#3a4f64] disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {loading ? 'Creating account...' : 'Sign Up'}
             </button>

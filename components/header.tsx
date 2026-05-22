@@ -69,13 +69,13 @@ export function Header() {
                 <div className="flex gap-2">
                   <Link
                     href="/auth/login"
-                    className="px-2 sm:px-4 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 whitespace-nowrap"
+                    className="px-2 sm:px-4 py-1.5 text-sm font-semibold text-[#0b3d6e] hover:text-[#3a4f64] hover:bg-[#e6d1b7]/35 rounded-lg transition whitespace-nowrap"
                   >
                     Sign In
                   </Link>
                   <Link
                     href="/auth/signup"
-                    className="px-3 sm:px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
+                    className="px-3 sm:px-4 py-1.5 text-sm font-semibold bg-[#0b3d6e] text-white rounded-lg hover:bg-[#3a4f64] transition whitespace-nowrap"
                   >
                     Sign Up
                   </Link>
