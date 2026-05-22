@@ -156,7 +156,7 @@ export default function AddExpensePage({ params }: { params: Promise<{ id: strin
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Add Expense</h1>
-      <form onSubmit={handleSubmit} className="space-y-5 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <form onSubmit={handleSubmit} className="space-y-5 bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
         {error && <p className="text-red-600 text-sm bg-red-50 rounded p-3">{error}</p>}
 
         <div>
@@ -170,7 +170,7 @@ export default function AddExpensePage({ params }: { params: Promise<{ id: strin
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
             <input
@@ -205,14 +205,14 @@ export default function AddExpensePage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-full max-w-[220px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
             />
           </div>
           <div>
@@ -322,7 +322,7 @@ export default function AddExpensePage({ params }: { params: Promise<{ id: strin
           )}
         </div>
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button
             type="button"
             onClick={() => router.back()}
