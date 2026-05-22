@@ -457,11 +457,14 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           </h2>
           <div className="space-y-3">
             {Object.values(spendSummary).map((summary) => {
-              const categoryEntries = convertExpenses
-                ? Object.entries(summary.categories)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 6)
-                : Object.entries(summary.categoriesByCurrency)
+              const convertedCategoryEntries = Object.entries(summary.categories)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6)
+              const perCurrencyCategoryEntries = Object.entries(summary.categoriesByCurrency)
+
+              const hasEntries = convertExpenses
+                ? convertedCategoryEntries.length > 0
+                : perCurrencyCategoryEntries.length > 0
               return (
                 <div key={summary.name} className="bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm">
                   <div className="flex items-center justify-between">
@@ -474,16 +477,16 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   </div>
 
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {categoryEntries.length === 0 ? (
+                    {!hasEntries ? (
                       <span className="text-xs text-gray-400">No paid expenses yet.</span>
                     ) : convertExpenses ? (
-                      categoryEntries.map(([cat, amount]) => (
+                      convertedCategoryEntries.map(([cat, amount]) => (
                         <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
                           {cat}: {formatAmount(amount, group.default_currency)}
                         </span>
                       ))
                     ) : (
-                      categoryEntries.map(([cat, values]) => (
+                      perCurrencyCategoryEntries.map(([cat, values]) => (
                         <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
                           {cat}: {formatCurrencyBreakdown(values)}
                         </span>

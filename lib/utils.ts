@@ -1,4 +1,9 @@
-import { ExpenseSplit, Member, Balance } from './types'
+import { Member, Balance } from './types'
+
+type BalanceSplit = {
+  member_id: string
+  amount: number
+}
 
 export const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -37,7 +42,7 @@ export function calculateBalances(
     currency: string
     exchange_rate: number
     paid_by: string
-    splits: ExpenseSplit[]
+    splits: BalanceSplit[]
   }[],
   members: Member[],
   baseCurrency: string
