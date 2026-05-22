@@ -835,9 +835,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   }}
                   className="w-full text-left bg-white border border-gray-100 rounded-xl px-4 py-4 sm:px-5 shadow-sm hover:border-[#6794c1] hover:shadow-md transition cursor-pointer"
                 >
-                  <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="font-semibold text-gray-800">{summary.name}</p>
-                    <p className="text-sm font-bold text-gray-800">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-gray-800 truncate">{summary.name}</p>
+                    <p className="text-sm font-bold text-gray-800 whitespace-nowrap">
                       {convertExpenses
                         ? formatAmount(summary.total, group.default_currency)
                         : formatCurrencyBreakdown(summary.totalByCurrency)}
