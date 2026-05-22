@@ -35,11 +35,13 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [expenseSortOrder, setExpenseSortOrder] = useState<'desc' | 'asc'>('desc')
   const [expenseFiltersOpen, setExpenseFiltersOpen] = useState(false)
   const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({})
+  const [expandedSummaryCategories, setExpandedSummaryCategories] = useState<Record<string, boolean>>({})
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [personModalCategories, setPersonModalCategories] = useState<string[]>([])
   const [personModalSortBy, setPersonModalSortBy] = useState<'date' | 'category'>('date')
   const [personModalSortOrder, setPersonModalSortOrder] = useState<'desc' | 'asc'>('desc')
   const [expensePage, setExpensePage] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('Loading group...')
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -53,7 +55,23 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
   useEffect(() => {
     setExpensePage(0)
-  }, [expenseCategoryFilter, expensePaidByFilter, expenseSortBy, expenseSortOrder])
+  }, [expenseCategoryFilter, expensePaidByFilter, expenseSortBy, expenseSortOrder, isMobile])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const handleViewportChange = (event: MediaQueryListEvent | MediaQueryList) => {
+      setIsMobile(event.matches)
+    }
+
+    handleViewportChange(mediaQuery)
+
+    const listener = (event: MediaQueryListEvent) => handleViewportChange(event)
+    mediaQuery.addEventListener('change', listener)
+
+    return () => {
+      mediaQuery.removeEventListener('change', listener)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -181,6 +199,13 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     }))
   }
 
+  function toggleSummaryCategories(memberId: string) {
+    setExpandedSummaryCategories((prev) => ({
+      ...prev,
+      [memberId]: !prev[memberId],
+    }))
+  }
+
   function goToExpensePage(pageNumber: number) {
     if (!Number.isFinite(pageNumber)) {
       return
@@ -262,7 +287,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       return expenseSortOrder === 'asc' ? compare : -compare
     })
 
-  const EXPENSE_PAGE_SIZE = 10
+  const EXPENSE_PAGE_SIZE = isMobile ? 5 : 10
   const expenseTotalPages = Math.ceil(visibleExpenses.length / EXPENSE_PAGE_SIZE)
   const pagedExpenses = visibleExpenses.slice(expensePage * EXPENSE_PAGE_SIZE, (expensePage + 1) * EXPENSE_PAGE_SIZE)
 
@@ -820,20 +845,14 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 6)
               const perCurrencyCategoryEntries = Object.entries(summary.categoriesByCurrency)
+              const isExpanded = !!expandedSummaryCategories[memberId]
               const hasEntries = convertExpenses
                 ? convertedCategoryEntries.length > 0
                 : perCurrencyCategoryEntries.length > 0
               return (
-                <button
+                <div
                   key={summary.name}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPersonId(memberId)
-                    setPersonModalCategories([])
-                    setPersonModalSortBy('date')
-                    setPersonModalSortOrder('desc')
-                  }}
-                  className="w-full text-left bg-white border border-gray-100 rounded-xl px-4 py-4 sm:px-5 shadow-sm hover:border-[#6794c1] hover:shadow-md transition cursor-pointer"
+                  className="bg-white border border-gray-100 rounded-xl px-4 py-4 sm:px-5 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-semibold text-gray-800 truncate">{summary.name}</p>
@@ -843,24 +862,47 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                         : formatCurrencyBreakdown(summary.totalByCurrency)}
                     </p>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {!hasEntries ? (
-                      <span className="text-xs text-gray-400">No paid expenses yet.</span>
-                    ) : convertExpenses ? (
-                      convertedCategoryEntries.map(([cat, amount]) => (
-                        <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
-                          {cat}: {formatAmount(amount, group.default_currency)}
-                        </span>
-                      ))
-                    ) : (
-                      perCurrencyCategoryEntries.map(([cat, values]) => (
-                        <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
-                          {cat}: {formatCurrencyBreakdown(values)}
-                        </span>
-                      ))
-                    )}
+                  <div className="mt-3 flex items-center gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => toggleSummaryCategories(memberId)}
+                      className="text-[#0b3d6e] font-medium hover:underline"
+                    >
+                      {isExpanded ? 'Hide categories' : 'View categories'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPersonId(memberId)
+                        setPersonModalCategories([])
+                        setPersonModalSortBy('date')
+                        setPersonModalSortOrder('desc')
+                      }}
+                      className="text-[#3a4f64] font-medium hover:underline"
+                    >
+                      View expenses
+                    </button>
                   </div>
-                </button>
+                  {isExpanded && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {!hasEntries ? (
+                        <span className="text-xs text-gray-400">No paid expenses yet.</span>
+                      ) : convertExpenses ? (
+                        convertedCategoryEntries.map(([cat, amount]) => (
+                          <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+                            {cat}: {formatAmount(amount, group.default_currency)}
+                          </span>
+                        ))
+                      ) : (
+                        perCurrencyCategoryEntries.map(([cat, values]) => (
+                          <span key={cat} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+                            {cat}: {formatCurrencyBreakdown(values)}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>
