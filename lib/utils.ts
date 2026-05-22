@@ -118,3 +118,23 @@ export async function fetchExchangeRate(
     return 1
   }
 }
+
+export function isLikelyWakeUpError(error: unknown): boolean {
+  const message =
+    typeof error === 'string'
+      ? error
+      : error && typeof error === 'object' && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : ''
+
+  const normalized = message.toLowerCase()
+
+  return (
+    normalized.includes('fetch failed') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network') ||
+    normalized.includes('timed out') ||
+    normalized.includes('timeout') ||
+    normalized.includes('temporarily unavailable')
+  )
+}

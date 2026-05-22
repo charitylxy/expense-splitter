@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { calculateBalances, formatAmount } from '@/lib/utils'
+import { calculateBalances, formatAmount, isLikelyWakeUpError } from '@/lib/utils'
 import { Expense, Member, Settlement } from '@/lib/types'
 
 type GroupData = {
@@ -35,6 +35,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [expenseSortOrder, setExpenseSortOrder] = useState<'desc' | 'asc'>('desc')
   const [expenseFiltersOpen, setExpenseFiltersOpen] = useState(false)
   const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({})
+  const [loadingMessage, setLoadingMessage] = useState('Loading group...')
+  const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -45,69 +47,117 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   }, [id])
 
   useEffect(() => {
-    async function loadGroup() {
-      const { data: groupData } = await supabase
-        .from('groups')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle()
+    let cancelled = false
 
-      if (!groupData) {
-        setGroup(null)
+    async function loadGroup() {
+      setLoading(true)
+      setLoadError('')
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          setLoadingMessage('Waking up database... this can take up to a minute.')
+          await new Promise((resolve) => setTimeout(resolve, 2500))
+        } else {
+          setLoadingMessage('Loading group...')
+        }
+
+        const { data: groupData, error: groupErr } = await supabase
+          .from('groups')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle()
+
+        if (cancelled) return
+
+        if (groupErr) {
+          if (isLikelyWakeUpError(groupErr) && attempt < 2) {
+            continue
+          }
+          setLoadError(
+            isLikelyWakeUpError(groupErr)
+              ? 'Database is waking up. Please refresh in a few seconds.'
+              : groupErr.message
+          )
+          setLoading(false)
+          return
+        }
+
+        if (!groupData) {
+          setGroup(null)
+          setLoading(false)
+          return
+        }
+
+        const { data: membersData, error: membersErr } = await supabase
+          .from('members')
+          .select('*')
+          .eq('group_id', id)
+          .order('created_at')
+
+        const { data: expensesData, error: expensesErr } = await supabase
+          .from('expenses')
+          .select(`
+            *,
+            category:categories(id, name),
+            payer:members!expenses_paid_by_fkey(id, name),
+            splits:expense_splits(id, member_id, amount, member:members(id, name))
+          `)
+          .eq('group_id', id)
+          .order('date', { ascending: false })
+
+        const criticalErr = membersErr ?? expensesErr
+        if (criticalErr) {
+          if (isLikelyWakeUpError(criticalErr) && attempt < 2) {
+            continue
+          }
+          setLoadError(
+            isLikelyWakeUpError(criticalErr)
+              ? 'Database is waking up. Please refresh in a few seconds.'
+              : criticalErr.message
+          )
+          setLoading(false)
+          return
+        }
+
+        const { data: settlementsData, error: settlementsErr } = await supabase
+          .from('settlements')
+          .select('*')
+          .eq('group_id', id)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false })
+
+        if (settlementsErr) {
+          const missingTable =
+            settlementsErr.code === '42P01' ||
+            settlementsErr.code === 'PGRST205' ||
+            settlementsErr.message.toLowerCase().includes('settlements')
+
+          if (missingTable) {
+            setSettlementFeatureReady(false)
+            setSettlementError('Settlements table is missing. Run supabase/settlements_migration.sql in Supabase SQL Editor.')
+          } else {
+            setSettlementFeatureReady(false)
+            setSettlementError(settlementsErr.message)
+          }
+        } else {
+          setSettlementFeatureReady(true)
+          setSettlementError('')
+          setSettlements((settlementsData as Settlement[]) ?? [])
+        }
+
+        setGroup(groupData as GroupData)
+        setMembers((membersData as Member[]) ?? [])
+        setExpenses((expensesData as Expense[]) ?? [])
         setLoading(false)
         return
       }
-
-      const { data: membersData } = await supabase
-        .from('members')
-        .select('*')
-        .eq('group_id', id)
-        .order('created_at')
-
-      const { data: expensesData } = await supabase
-        .from('expenses')
-        .select(`
-          *,
-          category:categories(id, name),
-          payer:members!expenses_paid_by_fkey(id, name),
-          splits:expense_splits(id, member_id, amount, member:members(id, name))
-        `)
-        .eq('group_id', id)
-        .order('date', { ascending: false })
-
-      const { data: settlementsData, error: settlementsErr } = await supabase
-        .from('settlements')
-        .select('*')
-        .eq('group_id', id)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-
-      if (settlementsErr) {
-        const missingTable =
-          settlementsErr.code === '42P01' ||
-          settlementsErr.code === 'PGRST205' ||
-          settlementsErr.message.toLowerCase().includes('settlements')
-
-        if (missingTable) {
-          setSettlementFeatureReady(false)
-          setSettlementError('Settlements table is missing. Run supabase/settlements_migration.sql in Supabase SQL Editor.')
-        } else {
-          setSettlementFeatureReady(false)
-          setSettlementError(settlementsErr.message)
-        }
-      } else {
-        setSettlementFeatureReady(true)
-        setSettlementError('')
-        setSettlements((settlementsData as Settlement[]) ?? [])
-      }
-
-      setGroup(groupData as GroupData)
-      setMembers((membersData as Member[]) ?? [])
-      setExpenses((expensesData as Expense[]) ?? [])
-      setLoading(false)
     }
 
     loadGroup()
+
+    return () => {
+      cancelled = true
+    }
   }, [id])
 
   function handleConversionChange(enabled: boolean) {
@@ -123,7 +173,23 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   }
 
   if (loading) {
-    return <div className="text-gray-500">Loading group...</div>
+    return <div className="text-gray-500">{loadingMessage}</div>
+  }
+
+  if (loadError) {
+    return (
+      <div className="bg-white border border-amber-200 rounded-xl p-6 shadow-sm">
+        <h1 className="text-xl font-semibold text-amber-800">Database Waking Up</h1>
+        <p className="text-sm text-amber-700 mt-1">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-4 bg-amber-100 text-amber-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-200 transition"
+        >
+          Retry
+        </button>
+      </div>
+    )
   }
 
   if (!group) {

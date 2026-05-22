@@ -4,23 +4,59 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Group } from '@/lib/types'
 import Link from 'next/link'
+import { isLikelyWakeUpError } from '@/lib/utils'
 
 export default function HomePage() {
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMessage, setLoadingMessage] = useState('Loading groups...')
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
-    async function loadGroups() {
-      const { data } = await supabase
-        .from('groups')
-        .select('*')
-        .order('created_at', { ascending: false })
+    let cancelled = false
 
-      setGroups((data as Group[]) ?? [])
-      setLoading(false)
+    async function loadGroups() {
+      setLoading(true)
+      setLoadError('')
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          setLoadingMessage('Waking up database... this can take up to a minute.')
+          await new Promise((resolve) => setTimeout(resolve, 2500))
+        } else {
+          setLoadingMessage('Loading groups...')
+        }
+
+        const { data, error } = await supabase
+          .from('groups')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (cancelled) return
+
+        if (!error) {
+          setGroups((data as Group[]) ?? [])
+          setLoading(false)
+          return
+        }
+
+        if (!isLikelyWakeUpError(error) || attempt === 2) {
+          setLoadError(
+            isLikelyWakeUpError(error)
+              ? 'Database is waking up. Please refresh in a few seconds.'
+              : error.message
+          )
+          setLoading(false)
+          return
+        }
+      }
     }
 
     loadGroups()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return (
@@ -36,7 +72,11 @@ export default function HomePage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-gray-400">Loading groups...</div>
+        <div className="text-center py-20 text-gray-400">{loadingMessage}</div>
+      ) : loadError ? (
+        <div className="text-center py-12 bg-white border border-gray-100 rounded-xl">
+          <p className="text-sm text-amber-700 bg-amber-50 inline-block px-3 py-2 rounded-lg">{loadError}</p>
+        </div>
       ) : groups.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
           <div className="text-5xl mb-4">🧳</div>
